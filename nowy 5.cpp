@@ -27,30 +27,49 @@ template<typename T> concept VectorLike = requires(T a, T b, std::size_t i) {
 		
 template<typename T> concept Gene = Scalar<T> || VectorLike<T>;
 
-template<Scalar T>
-T add(const T& a, const T& b) { return a + b; }
-
-template<VectorLike T>
-T add(const T& a, const T& b) {
-    T r = a;
-    for (std::size_t i = 0; i < r.size(); ++i)
-        r[i] += b[i];
-    return r;}
+template<Gene T> struct GeneOps;
 
 template<Scalar T>
-T random_delta(RNG& rng, double intensity) {
-    std::uniform_real_distribution<double> d(-intensity, intensity);
-    return static_cast<T>(d(rng.engine()));
-}
+struct GeneOps<T> {
+    static T add(const T& a, const T& b) { return a + b; }
+    static T mul(const T& a, double s) { return static_cast<T>(a * s); }
+
+    static T random_delta(RNG& rng, double intensity) {
+        std::uniform_real_distribution<double> d(-intensity, intensity);
+        return static_cast<T>(d(rng.engine()));
+    }
+
+    static double to_scalar(const T& x) {
+        return static_cast<double>(x);
+    }
+};
 
 template<VectorLike T>
-T random_delta(RNG& rng, double intensity) {
-    T r;
-    std::uniform_real_distribution<double> d(-intensity, intensity);
-    for (auto& v : r)
-        v = d(rng.engine());
-    return r;
-}
+struct GeneOps<T> {
+    static T add(const T& a, const T& b) {
+        T r = a;
+        for (std::size_t i = 0; i < r.size(); ++i)
+            r[i] += b[i];
+        return r;
+    }
+
+    static T mul(const T& a, double s) {
+        T r = a;
+        for (auto& v : r) v *= s;
+        return r;
+    }
+
+    static T random_delta(const T& sample, RNG& rng, double intensity) {
+        T r = sample;
+        std::uniform_real_distribution<double> d(-intensity, intensity);
+        for (auto& v : r) v = d(rng.engine());
+        return r;
+    }
+
+    static double to_scalar(const T& x) {
+        return std::accumulate(x.begin(), x.end(), 0.0) / x.size();
+    }
+};
 
 
 //#############################
@@ -115,11 +134,12 @@ public:
     void mutate(std::vector<Type>& population, RNG& rng) const {
         std::uniform_int_distribution<int> prob(0, 99);
 
-        for (auto& x : population) {
-            if (prob(rng.engine()) < CHANCE) {
-                x = add(x, random_delta<Type>(rng, INTENSITY));
-            }
-        }
+        for (auto& x : population)
+            if (prob(rng.engine()) < CHANCE)
+                x = GeneOps<Type>::add(
+                        x,
+                        GeneOps<Type>::random_delta(x, rng, INTENSITY)
+                    );
     }
 };
 
@@ -131,7 +151,10 @@ public:
    static_assert(WEIGHT >= 0 && WEIGHT <= 1, "Value must be >=0 and <= 1");
 
     Type crossover(const Type& a, const Type& b, RNG&) const {
-        return add(mul(a, WEIGHT), mul(b, 1.0 - WEIGHT));
+        return GeneOps<Type>::add(
+            GeneOps<Type>::mul(a, WEIGHT),
+            GeneOps<Type>::mul(b, 1.0 - WEIGHT)
+        );
     }
 };
 
@@ -247,8 +270,10 @@ template<typename Type, double PARAM>
 class StableAvgStopConditionPolicy {
 public:
     bool shouldStop(const std::vector<Type>& population, std::size_t) {
-        double avg = std::accumulate(population.begin(), population.end(), 0.0)
-                     / population.size();
+        double avg = 0.0;
+        for (auto& x : population)
+            avg += GeneOps<Type>::to_scalar(x);
+        avg /= population.size();
 
         if (initialized && std::abs(avg - lastAvg) < PARAM) {
             if (++stableCount > 2)
