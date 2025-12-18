@@ -236,8 +236,14 @@ private:
 
 
 //Algorytm ewolucyjny
+
+///////////////////////////////
 template<typename T>
-concept Arithmetic = std::is_arithmetic_v<T>;
+concept Genome =
+    std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>;
+
+
+
 
 template<typename Type, typename InitPolicy, typename MutationPolicy,
          typename CrossoverPolicy, typename SelectionPolicy, typename StopPolicy>
