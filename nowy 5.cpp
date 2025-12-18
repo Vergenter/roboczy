@@ -8,13 +8,6 @@
 #include <limits>
 #include <type_traits>
 
-class RNG {
-public:
-    explicit RNG(unsigned seed = std::random_device{}()) : gen(seed) {}
-    std::mt19937& engine() { return gen;}
-private:
-    std::mt19937 gen;};
-
 //###########################
 template<typename T> concept Scalar = std::is_arithmetic_v<T>;
 
@@ -34,10 +27,10 @@ struct GeneOps<T> {
     static T add(const T& a, const T& b) { return a + b; }
     static T mul(const T& a, double s) { return static_cast<T>(a * s); }
 
-    static T random_delta(RNG& rng, double intensity) {
-        std::uniform_real_distribution<double> d(-intensity, intensity);
-        return static_cast<T>(d(rng.engine()));
-    }
+    static T random_delta(const T& /*sample*/, std::mt19937& rng, double intensity) {
+    std::uniform_real_distribution<double> d(-intensity, intensity);
+    return static_cast<T>(d(rng));}
+
 
     static double to_scalar(const T& x) {
         return static_cast<double>(x);
@@ -59,10 +52,10 @@ struct GeneOps<T> {
         return r;
     }
 
-    static T random_delta(const T& sample, RNG& rng, double intensity) {
+    static T random_delta(const T& sample, std::mt19937& rng, double intensity) {
         T r = sample;
         std::uniform_real_distribution<double> d(-intensity, intensity);
-        for (auto& v : r) v = d(rng.engine());
+        for (auto& v : r) v = d(rng);
         return r;
     }
 
@@ -71,40 +64,53 @@ struct GeneOps<T> {
     }
 };
 
-
 //#############################
 
 //Polityki inicjalizacji
-template<typename Type, Type MIN, Type MAX>
+template<typename Type>
 class RandomInitiationPolicy {
 public:
-    void init(std::vector<Type>& population, std::size_t size, RNG& rng) const {
+    RandomInitiationPolicy(Type min, Type max) : min_(min), max_(max) {}
+
+    void init(std::vector<Type>& population, std::size_t size, std::mt19937& rng) const {
         population.resize(size);
         if constexpr (std::is_integral_v<Type>) {
-            std::uniform_int_distribution<Type> dist(MIN, MAX);
-            for (auto& x : population) x = dist(rng.engine());
+            std::uniform_int_distribution<Type> dist(min_, max_);
+            for (auto& x : population) x = dist(rng);
         } else {
-            std::uniform_real_distribution<Type> dist(MIN, MAX);
-            for (auto& x : population) x = dist(rng.engine());
+            std::uniform_real_distribution<Type> dist(min_, max_);
+            for (auto& x : population) x = dist(rng);
         }
     }
+
+private:
+    Type min_;
+    Type max_;
 };
 
-template<typename Type, Type MIN, Type MAX>
+
+template<typename Type>
 class LinSpaceInitiationPolicy {
 public:
+    LinSpaceInitiationPolicy(Type min, Type max) : min_(min), max_(max) {}
 
     void init(std::vector<Type>& population, std::size_t size, RNG&) const {
         population.resize(size);
         if (size == 0) return;
-        if (size == 1) { population[0] = MIN; return; }
+        if (size == 1) { population[0] = min_; return; }
 
         using CT = std::common_type_t<Type, double>;
-        CT step = (static_cast<CT>(MAX) - static_cast<CT>(MIN)) / static_cast<CT>(size - 1);
+        CT step = (static_cast<CT>(max_) - static_cast<CT>(min_)) / static_cast<CT>(size - 1);
         for (std::size_t i = 0; i < size; ++i)
-            population[i] = static_cast<Type>(static_cast<CT>(MIN) + i * step);
+            population[i] = static_cast<Type>(static_cast<CT>(min_) + i * step);
     }
+
+private:
+    Type min_;
+    Type max_;
 };
+
+
 
 //Polityki mutacji
 template<typename Type, int CHANCE, int INTENSITY>
@@ -113,16 +119,15 @@ public:
     static_assert(CHANCE >= 0 && CHANCE <= 100,"Value must be >=0 and <= 100" );
 	static_assert(INTENSITY > 0, "Value must be >0");
 
-    void mutate(std::vector<Type>& population, RNG& rng) const {
+    void mutate(std::vector<Type>& population, std::mt19937& rng) const {
         std::uniform_int_distribution<int> prob(0, 99);
         std::uniform_real_distribution<double> factor(
             1.0 - INTENSITY / 100.0,
-            1.0 + INTENSITY / 100.0
-        );
+            1.0 + INTENSITY / 100.0);
 
         for (auto& x : population)
             if (prob(rng.engine()) < CHANCE)
-                x = static_cast<Type>(x * factor(rng.engine()));
+                x = GeneOps<Type>::mul(x, factor(rng.engine()));;
     }
 };
 
@@ -131,7 +136,7 @@ class AbsoluteMutationPolicy {
 public:
 	static_assert(CHANCE >= 0 && CHANCE <= 100, "Value must be >=0 and <= 100");
 	static_assert(INTENSITY > 0, "Value must be >0");
-    void mutate(std::vector<Type>& population, RNG& rng) const {
+    void mutate(std::vector<Type>& population, std::mt19937& rng) const {
         std::uniform_int_distribution<int> prob(0, 99);
 
         for (auto& x : population)
@@ -162,10 +167,12 @@ template<typename Type>
 class RandomCrossoverPolicy {
 public:
    
-    Type crossover(const Type& a, const Type& b, RNG& rng) const {
+    Type crossover(const Type& a, const Type& b, std::mt19937& rng) const {
         std::uniform_real_distribution<double> w(0.0, 1.0);
         double weight = w(rng.engine());
-        return static_cast<Type>(weight * a + (1.0 - weight) * b);
+        return GeneOps<Type>::add(GeneOps<Type>::mul(a, weight),
+            GeneOps<Type>::mul(b, 1.0 - weight)
+        );
     }
 };
 
@@ -173,16 +180,16 @@ public:
 template<typename Type>
 class RandomSelectionPolicy {
 public:
-    std::pair<Type, Type> select(const std::vector<Type>& population, RNG& rng) const {
+    std::pair<Type, Type> select(const std::vector<Type>& population, std::mt19937& rng) const {
         std::uniform_int_distribution<std::size_t> dist(0, population.size() - 1);
-        return { population[dist(rng.engine())], population[dist(rng.engine())] };
+        return { population[dist(rng)], population[dist(rng)] };
     }
 };
 
 template<typename Type>
 class UniqueRandomSelectionPolicy {
 public:
-    std::pair<Type, Type> select(const std::vector<Type>& population, RNG& rng) {
+    std::pair<Type, Type> select(const std::vector<Type>& population, std::mt19937& rng) {
         if (pairs.empty() || cachedSize != population.size()) {
             buildPairs(population.size(), rng);
             cachedSize = population.size();
@@ -197,7 +204,7 @@ private:
     std::vector<std::pair<std::size_t, std::size_t>> pairs;
     std::size_t cachedSize = 0;
 
-    void buildPairs(std::size_t n, RNG& rng) {
+    void buildPairs(std::size_t n, std::mt19937& rng) {
         pairs.clear();
         pairs.reserve(n * (n - 1));
 
@@ -213,7 +220,7 @@ private:
 };
 
 
-template<typename Type, typename Fitness, int FIRST, int LAST>
+template<typename Type, int FIRST, int LAST, typename Fitness>
 class TargetSelectionPolicy {
 public:
     static_assert(FIRST >= 0 && FIRST <= 100, "Value must be >=0 and <= 100");
@@ -221,7 +228,7 @@ public:
 
     explicit TargetSelectionPolicy(Fitness fit) : fit(fit) {}
 
-    std::pair<Type, Type> select(const std::vector<Type>& population, RNG& rng) const {
+    std::pair<Type, Type> select(const std::vector<Type>& population, std::mt19937& rng) const {
         const std::size_t n = population.size();
 
         std::vector<std::size_t> idx(n);
@@ -247,8 +254,8 @@ public:
         std::discrete_distribution<std::size_t> dist(probs.begin(), probs.end());
 
         return {
-            population[idx[dist(rng.engine())]],
-            population[idx[dist(rng.engine())]]
+            population[idx[dist(rng)]],
+            population[idx[dist(rng)]]
         };
     }
 
@@ -307,7 +314,7 @@ public:
         MutationPolicy mutation = MutationPolicy{},
         CrossoverPolicy crossover = CrossoverPolicy{},
         StopPolicy stop = StopPolicy{},
-        RNG rng = RNG{}
+        std::mt19937 rng = std::mt19937{std::random_device{}()})
     )
         : populationSize(populationSize),
           initPolicy(std::move(init)),
@@ -357,16 +364,31 @@ private:
 
 
 //###############
-double fitness(const std::vector<double>& v);
-double fitness(const std::array<double, 5>& a);
+template<Scalar T>
+double fitness(const T& x) {
+    return -std::abs(x);
+}
+
+template<VectorLike T>
+double fitness(const T& x) {
+    double sum = 0.0;
+    for (auto v : x) sum += v * v;
+    return -std::sqrt(sum);
+}
+
+
 //#################
 
 int main() {
-    auto sel = TargetSelectionPolicy<double, decltype(&fitness), 50, 5>(&fitness);
+	std::mt19937 rng(42);
+	auto fit = [](const auto& x) {return fitness(x);};
+	
+    using Sel = TargetSelectionPolicy<double, 50, 5, decltype(fit)>; 
+	Sel sel(fit);
 
-    EvolutionaryAlgorithm<
-    double,
-    LinSpaceInitiationPolicy<double, -10.0, 10.0>,
+
+    EvolutionaryAlgorithm<double,
+    LinSpaceInitiationPolicy<double>,
     AbsoluteMutationPolicy<double, 20, 10.0>,
     AverageCrossoverPolicy<double, 1.0>,
     
@@ -377,9 +399,9 @@ int main() {
     sel,
     //{},
 	
-    {}, {}, {}, {},   // domyślne polityki
-    RNG(42)
-);
+	LinSpaceInitiationPolicy<double>(-10.0, 10.0),
+     {}, {}, {},   // domyślne polityki
+    rng);
 
     algo.run();
 
