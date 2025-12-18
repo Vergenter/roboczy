@@ -94,7 +94,7 @@ class LinSpaceInitiationPolicy {
 public:
     LinSpaceInitiationPolicy(Type min, Type max) : min_(min), max_(max) {}
 
-    void init(std::vector<Type>& population, std::size_t size, RNG&) const {
+    void init(std::vector<Type>& population, std::size_t size, std::mt19937&) const {
         population.resize(size);
         if (size == 0) return;
         if (size == 1) { population[0] = min_; return; }
@@ -126,8 +126,8 @@ public:
             1.0 + INTENSITY / 100.0);
 
         for (auto& x : population)
-            if (prob(rng.engine()) < CHANCE)
-                x = GeneOps<Type>::mul(x, factor(rng.engine()));;
+            if (prob(rng) < CHANCE)
+                x = GeneOps<Type>::mul(x, factor(rng));;
     }
 };
 
@@ -140,7 +140,7 @@ public:
         std::uniform_int_distribution<int> prob(0, 99);
 
         for (auto& x : population)
-            if (prob(rng.engine()) < CHANCE)
+            if (prob(rng) < CHANCE)
                 x = GeneOps<Type>::add(
                         x,
                         GeneOps<Type>::random_delta(x, rng, INTENSITY)
@@ -155,7 +155,7 @@ class AverageCrossoverPolicy {
 public:
    static_assert(WEIGHT >= 0 && WEIGHT <= 1, "Value must be >=0 and <= 1");
 
-    Type crossover(const Type& a, const Type& b, RNG&) const {
+    Type crossover(const Type& a, const Type& b, std::mt19937&) const {
         return GeneOps<Type>::add(
             GeneOps<Type>::mul(a, WEIGHT),
             GeneOps<Type>::mul(b, 1.0 - WEIGHT)
@@ -169,7 +169,7 @@ public:
    
     Type crossover(const Type& a, const Type& b, std::mt19937& rng) const {
         std::uniform_real_distribution<double> w(0.0, 1.0);
-        double weight = w(rng.engine());
+        double weight = w(rng);
         return GeneOps<Type>::add(GeneOps<Type>::mul(a, weight),
             GeneOps<Type>::mul(b, 1.0 - weight)
         );
@@ -215,7 +215,7 @@ private:
             }
         }
 
-        std::shuffle(pairs.begin(), pairs.end(), rng.engine());
+        std::shuffle(pairs.begin(), pairs.end(), rng);
     }
 };
 
@@ -315,7 +315,6 @@ public:
         CrossoverPolicy crossover = CrossoverPolicy{},
         StopPolicy stop = StopPolicy{},
         std::mt19937 rng = std::mt19937{std::random_device{}()})
-    )
         : populationSize(populationSize),
           initPolicy(std::move(init)),
           mutationPolicy(std::move(mutation)),
@@ -403,8 +402,6 @@ int main() {
      {}, {}, {},   // domyślne polityki
     rng);
 
-    algo.run();
-
-}
+    algo.run();}
 
 
