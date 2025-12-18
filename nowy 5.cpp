@@ -9,14 +9,13 @@
 #include <type_traits>
 
 //###########################
-template<typename T> concept Scalar = std::is_arithmetic_v<T>;
+template<typename T> concept Scalar = std::is_arithmetic_v<std::remove_cvref_t<T>>;
 
-template<typename T> concept VectorLike = requires(T a, T b, std::size_t i) {
+template<typename T> concept VectorLike = requires(T a, std::size_t i) {
         { a.size() } -> std::convertible_to<std::size_t>;
-        { a[i] }     -> Scalar;
-        { a + b }    -> std::same_as<T>;
-        { a - b }    -> std::same_as<T>;
-        { a * 1.0 }  -> std::same_as<T>;};
+        { a[i] };               // dostęp przez indeks
+        { std::begin(a) };      // iterowalny
+        { std::end(a) };} && Scalar<std::remove_cvref_t<decltype(std::declval<T>()[0])>>;
 		
 template<typename T> concept Gene = Scalar<T> || VectorLike<T>;
 
@@ -70,7 +69,7 @@ struct GeneOps<T> {
 template<typename Type>
 class RandomInitiationPolicy {
 public:
-    RandomInitiationPolicy(Type min, Type max) : min_(min), max_(max) {}
+    RandomInitiationPolicy(const Type min,const Type max) : min_(min), max_(max) {}
 
     void init(std::vector<Type>& population, std::size_t size, std::mt19937& rng) const {
         population.resize(size);
@@ -92,7 +91,7 @@ private:
 template<typename Type>
 class LinSpaceInitiationPolicy {
 public:
-    LinSpaceInitiationPolicy(Type min, Type max) : min_(min), max_(max) {}
+    LinSpaceInitiationPolicy(const Type min, const Type max) : min_(min), max_(max) {}
 
     void init(std::vector<Type>& population, std::size_t size, std::mt19937&) const {
         population.resize(size);
@@ -378,28 +377,52 @@ double fitness(const T& x) {
 
 int main() {
 	std::mt19937 rng(42);
-	auto fit = [](const auto& x) {return fitness(x);};
-	
-    using Sel = TargetSelectionPolicy<double, 50, 5, decltype(fit)>; 
-	Sel sel(fit);
+	//auto fit = [](const auto& x) {return fitness(x);};
+    //using selection = TargetSelectionPolicy<double, 50, 5, decltype(fit)>; 
 
-
+/*
     EvolutionaryAlgorithm<double,
     LinSpaceInitiationPolicy<double>,
     AbsoluteMutationPolicy<double, 20, 10.0>,
     AverageCrossoverPolicy<double, 1.0>,
     
     //RandomSelectionPolicy<double>,
-    decltype(sel),
-    
+    selection,
     StableAvgStopConditionPolicy<double, 0.5> > algo(20,
-    sel,
+    selection(fit),
     //{},
 	
 	LinSpaceInitiationPolicy<double>(-10.0, 10.0),
      {}, {}, {},   // domyślne polityki
     rng);
+    algo.run();
+*/
+	
+	auto fit = [](const std::vector<double>& v) {return fitness(v);};
+	using selection = TargetSelectionPolicy<double, 50, 5, decltype(fit)>; 
 
-    algo.run();}
+    using Selection = TargetSelectionPolicy<std::vector<double>, 60, 10, decltype(fit)>;
+
+    EvolutionaryAlgorithm<
+        Vec,
+        RandomVectorInit,
+        AbsoluteMutationPolicy<Vec, 30, 0.5>,
+        RandomCrossoverPolicy<Vec>,
+        Selection,
+        StableAvgStopConditionPolicy<Vec, 0.001>
+    > algo(
+        30,
+        Selection(fit),
+        RandomInitiationPolicy(3, -5.0, 5.0), // wektory 3-wymiarowe
+        {},
+        {},
+        {},
+        rng
+    );
+
+    algo.run();
+	
+	
+	}
 
 
