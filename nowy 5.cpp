@@ -15,6 +15,46 @@ public:
 private:
     std::mt19937 gen;};
 
+//###########################
+template<typename T> concept Scalar = std::is_arithmetic_v<T>;
+
+template<typename T> concept VectorLike = requires(T a, T b, std::size_t i) {
+        { a.size() } -> std::convertible_to<std::size_t>;
+        { a[i] }     -> Scalar;
+        { a + b }    -> std::same_as<T>;
+        { a - b }    -> std::same_as<T>;
+        { a * 1.0 }  -> std::same_as<T>;};
+		
+template<typename T> concept Gene = Scalar<T> || VectorLike<T>;
+
+template<Scalar T>
+T add(const T& a, const T& b) { return a + b; }
+
+template<VectorLike T>
+T add(const T& a, const T& b) {
+    T r = a;
+    for (std::size_t i = 0; i < r.size(); ++i)
+        r[i] += b[i];
+    return r;}
+
+template<Scalar T>
+T random_delta(RNG& rng, double intensity) {
+    std::uniform_real_distribution<double> d(-intensity, intensity);
+    return static_cast<T>(d(rng.engine()));
+}
+
+template<VectorLike T>
+T random_delta(RNG& rng, double intensity) {
+    T r;
+    std::uniform_real_distribution<double> d(-intensity, intensity);
+    for (auto& v : r)
+        v = d(rng.engine());
+    return r;
+}
+
+
+//#############################
+
 //Polityki inicjalizacji
 template<typename Type, Type MIN, Type MAX>
 class RandomInitiationPolicy {
@@ -67,28 +107,22 @@ public:
     }
 };
 
-template<typename Type, int CHANCE, Type INTENSITY>
+template<Gene Type, int CHANCE, double INTENSITY>
 class AbsoluteMutationPolicy {
 public:
-    static_assert(CHANCE >= 0 && CHANCE <= 100, "Value must be >=0 and <= 100");
+	static_assert(CHANCE >= 0 && CHANCE <= 100, "Value must be >=0 and <= 100");
 	static_assert(INTENSITY > 0, "Value must be >0");
-
     void mutate(std::vector<Type>& population, RNG& rng) const {
         std::uniform_int_distribution<int> prob(0, 99);
 
-        if constexpr (std::is_integral_v<Type>) {
-            std::uniform_int_distribution<Type> delta(-INTENSITY, INTENSITY);
-            for (auto& x : population)
-                if (prob(rng.engine()) < CHANCE)
-                    x += delta(rng.engine());
-        } else {
-            std::uniform_real_distribution<Type> delta(-INTENSITY, INTENSITY);
-            for (auto& x : population)
-                if (prob(rng.engine()) < CHANCE)
-                    x += delta(rng.engine());
+        for (auto& x : population) {
+            if (prob(rng.engine()) < CHANCE) {
+                x = add(x, random_delta<Type>(rng, INTENSITY));
+            }
         }
     }
 };
+
 
 //Polityki krzyżowania  
 template<typename Type, double WEIGHT>
@@ -97,7 +131,7 @@ public:
    static_assert(WEIGHT >= 0 && WEIGHT <= 1, "Value must be >=0 and <= 1");
 
     Type crossover(const Type& a, const Type& b, RNG&) const {
-        return static_cast<Type>(WEIGHT * a + (1.0 - WEIGHT) * b);
+        return add(mul(a, WEIGHT), mul(b, 1.0 - WEIGHT));
     }
 };
 
@@ -237,15 +271,7 @@ private:
 
 //Algorytm ewolucyjny
 
-///////////////////////////////
-template<typename T>
-concept Genome =
-    std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>;
-
-
-
-
-template<typename Type, typename InitPolicy, typename MutationPolicy,
+template<Gene Type, typename InitPolicy, typename MutationPolicy,
          typename CrossoverPolicy, typename SelectionPolicy, typename StopPolicy>
 class EvolutionaryAlgorithm {
 public:
@@ -305,8 +331,10 @@ private:
 };
 
 
-
-double fitness(double x) { return -(x - 3) * (x - 3); }
+//###############
+double fitness(const std::vector<double>& v);
+double fitness(const std::array<double, 5>& a);
+//#################
 
 int main() {
     auto sel = TargetSelectionPolicy<double, decltype(&fitness), 50, 5>(&fitness);
