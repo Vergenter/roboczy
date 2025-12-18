@@ -30,7 +30,6 @@ struct GeneOps<T> {
     std::uniform_real_distribution<double> d(-intensity, intensity);
     return static_cast<T>(d(rng));}
 
-
     static double to_scalar(const T& x) {
         return static_cast<double>(x);
     }
@@ -83,8 +82,8 @@ public:
     }
 
 private:
-    Type min_;
-    Type max_;
+    const min_;
+    const max_;
 };
 
 
@@ -105,8 +104,8 @@ public:
     }
 
 private:
-    Type min_;
-    Type max_;
+    const min_;
+    const max_;
 };
 
 
@@ -254,13 +253,9 @@ public:
 
         return {
             population[idx[dist(rng)]],
-            population[idx[dist(rng)]]
-        };
-    }
-
+            population[idx[dist(rng)]]};}
 private:
-    Fitness fit;
-};
+    Fitness fit;};
 
 
 //Polityki warunku stopu
@@ -339,14 +334,18 @@ public:
 
             population = std::move(newPopulation);
             mutationPolicy.mutate(population, rng);
-
+		
+		/*
         std::cout << "Generacja " << generation << ": ";
         for (const auto& x : population)
             std::cout << std::round(x* 1000.0) / 1000.0 << ' ';
         std::cout << '\n';
+		*/
 
         ++generation;
     }
+	std::cout << "Algorithm stopped after " << generation << " generations.\n";
+    printPopulation();
 }
 
 private:
@@ -403,22 +402,17 @@ int main() {
 
     using Selection = TargetSelectionPolicy<std::vector<double>, 60, 10, decltype(fit)>;
 
-    EvolutionaryAlgorithm<
-        Vec,
-        RandomVectorInit,
-        AbsoluteMutationPolicy<Vec, 30, 0.5>,
-        RandomCrossoverPolicy<Vec>,
+    EvolutionaryAlgorithm<std::vector<double>,
+        RandomInitiationPolicy<double>,
+        AbsoluteMutationPolicy<std::vector<double>, 30, 0.5>,
+        RandomCrossoverPolicy<std::vector<double>>,
         Selection,
-        StableAvgStopConditionPolicy<Vec, 0.001>
+        StableAvgStopConditionPolicy<std::vector<double>, 0.001>
     > algo(
         30,
         Selection(fit),
-        RandomInitiationPolicy(3, -5.0, 5.0), // wektory 3-wymiarowe
-        {},
-        {},
-        {},
-        rng
-    );
+        RandomInitiationPolicy( -5.0, 5.0), // wektory 3-wymiarowe
+        {},{},{},rng);
 
     algo.run();
 	
