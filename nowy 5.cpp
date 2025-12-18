@@ -358,7 +358,7 @@ private:
     CrossoverPolicy crossoverPolicy;
     SelectionPolicy selection;
     StopPolicy stopPolicy;
-    RNG rng;
+    std::mt19937 rng;
 };
 
 
@@ -374,8 +374,6 @@ double fitness(const T& x) {
     for (auto v : x) sum += v * v;
     return -std::sqrt(sum);
 }
-
-
 //#################
 
 int main() {
