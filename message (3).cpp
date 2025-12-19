@@ -347,8 +347,7 @@ public:
 
       ++generation;
     }
-
-    std::cout << "Algorithm stopped.\n";
+    std::cout << "  finished after " << generation << " generations\n";
   }
 
 private:
