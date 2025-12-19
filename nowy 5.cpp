@@ -25,10 +25,12 @@ template<Scalar T>
 struct GeneOps<T> {
     static T add(const T& a, const T& b) { return a + b; }
     static T mul(const T& a, double s) { return static_cast<T>(a * s);
+	
     static T random_delta(const T&, std::mt19937& rng, double intensity) {
     std::uniform_real_distribution<double> d(-intensity, intensity);
     return static_cast<T>(d(rng));}
 	
+
 	static T random_between(const T& min, const T& max, std::mt19937& rng);}
 
     static double to_scalar(const T& x) {return static_cast<double>(x);}
@@ -83,8 +85,8 @@ public:
     }
 
 private:
-    const min_;
-    const max_;
+    const Type min_;
+    const Type max_;
 };
 
 
@@ -103,8 +105,8 @@ public:
     }
 
 private:
-    const min_;
-    const max_;
+    const Type min_;
+    const Type max_;
 };
 
 
