@@ -593,6 +593,90 @@ run_test("RandomInitiationPolicy (vector): per-component range", [] {
     assert(stopped); // your implementation needs >2 stable checks, so should stop by gen ~3-4
   });
 
+run_test("E2E scalar: converges toward zero", [] {
+  using T = double;
+
+  std::mt19937 rng(123);
+
+  RandomSelectionPolicy<T> selection;
+  RandomInitiationPolicy<T> init(-10.0, 10.0);
+  AbsoluteMutationPolicy<T, 40, 0.5> mutation;
+  AverageCrossoverPolicy<T, 0.5> crossover;
+  StableAvgStopConditionPolicy<T, 1e-2> stop;
+
+  EvolutionaryAlgorithm<
+    T,
+    decltype(init),
+    decltype(mutation),
+    decltype(crossover),
+    decltype(selection),
+    decltype(stop)
+  > ea(
+    50,
+    selection,
+    init,
+    mutation,
+    crossover,
+    stop,
+    rng
+  );
+
+  ea.run();
+
+  std::vector<T> pop(50);
+  init.init(pop, rng);
+
+  double avgAbs = 0.0;
+  for (auto x : pop) avgAbs += std::abs(x);
+  avgAbs /= pop.size();
+
+  assert(avgAbs < 5.0);
+});
+
+run_test("E2E vector<2>: converges toward origin", [] {
+  using V = std::array<double, 2>;
+
+  std::mt19937 rng(123);
+
+  V mn{ {-5.0, -5.0} };
+  V mx{ { 5.0,  5.0} };
+
+  RandomSelectionPolicy<V> selection;
+  RandomInitiationPolicy<V> init(mn, mx);
+  AbsoluteMutationPolicy<V, 40, 0.4> mutation;
+  AverageCrossoverPolicy<V, 0.5> crossover;
+  StableAvgStopConditionPolicy<V, 1e-2> stop;
+
+  EvolutionaryAlgorithm<
+    V,
+    decltype(init),
+    decltype(mutation),
+    decltype(crossover),
+    decltype(selection),
+    decltype(stop)
+  > ea(
+    60,
+    selection,
+    init,
+    mutation,
+    crossover,
+    stop,
+    rng
+  );
+
+  ea.run();
+
+  std::vector<V> pop(60);
+  init.init(pop, rng);
+
+  double avgNorm = 0.0;
+  for (auto& x : pop)
+    avgNorm += std::sqrt(x[0]*x[0] + x[1]*x[1]);
+
+  avgNorm /= pop.size();
+
+  assert(avgNorm < 4.0);
+});
   std::cout << "=== ALL POLICY TESTS PASSED ===\n";
   return 0;
 }
