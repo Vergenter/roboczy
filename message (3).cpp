@@ -105,6 +105,21 @@ double to_scalar(const U& x) requires VectorLike<U> {
   return (n == 0) ? 0.0 : (sum / static_cast<double>(n));}
 }
 
+template <VectorLike V> std::ostream& operator<<(std::ostream& os, const V& v) {
+  os << '[';
+  auto it = std::begin(v);
+  auto end = std::end(v);
+
+  if (it != end) {
+    os << *it;
+    ++it;}
+
+  for (; it != end; ++it) {
+    os << ", " << *it;}
+
+  return os << ']';
+}
+
 template<typename Type> class RandomInitiationPolicy {
 public:
   RandomInitiationPolicy(const Type& min, const Type& max) : min_(min), max_(max) {}
@@ -215,13 +230,11 @@ public:
   std::pair<Type, Type> select(const std::vector<Type>& population, std::mt19937& rng) {
     if (pairs.empty() || cachedSize != population.size()) {
       buildPairs(population.size(), rng);
-      cachedSize = population.size();
-    }
+      cachedSize = population.size();}
 
     auto [i, j] = pairs.back();
     pairs.pop_back();
-    return { population[i], population[j] };
-  }
+    return { population[i], population[j] };}
 
 private:
   std::vector<std::pair<std::size_t, std::size_t>> pairs;
@@ -234,11 +247,8 @@ private:
     for (std::size_t i = 0; i < n; ++i) {
       for (std::size_t j = i + 1; j < n; ++j) {
         pairs.emplace_back(i, j);
-        pairs.emplace_back(j, i);
-      }
-    }
-    std::shuffle(pairs.begin(), pairs.end(), rng);
-  }
+        pairs.emplace_back(j, i);}}
+    std::shuffle(pairs.begin(), pairs.end(), rng);}
 };
 
 template<typename Type, int FIRST, int LAST, typename Fitness> class TargetSelectionPolicy {
@@ -258,14 +268,13 @@ public:
 
     std::vector<double> probs(n);
     if (n == 1) {
-      probs[0] = 1.0;
-    } else {
-      const double first = static_cast<double>(FIRST); // raw weight
-      const double last  = static_cast<double>(LAST);  // raw weight
+      probs[0] = 1.0;} 
+	  else {
+      const double first = static_cast<double>(FIRST); 
+      const double last  = static_cast<double>(LAST);  
       const double step  = (first - last) / static_cast<double>(n - 1);
       for (std::size_t i = 0; i < n; ++i)
-        probs[i] = first - static_cast<double>(i) * step; // linear ramp from first..last
-    }
+        probs[i] = first - static_cast<double>(i) * step;}
 
     std::discrete_distribution<std::size_t> dist(probs.begin(), probs.end());
     return { population[idx[dist(rng)]], population[idx[dist(rng)]] };
@@ -291,10 +300,9 @@ public:
     avg /= population.size();
 
     if (initialized && std::abs(avg - lastAvg) < PARAM) {
-      if (++stableCount > 2) return true;
-    } else {
-      stableCount = 0;
-    }
+      if (++stableCount > 2) return true;} 
+	else {
+      stableCount = 0;}
 
     lastAvg = avg;
     initialized = true;
@@ -313,23 +321,21 @@ template<Gene Type, typename InitPolicy, typename MutationPolicy,
 class EvolutionaryAlgorithm {
 public:
   EvolutionaryAlgorithm(
-    std::size_t populationSize,
-    SelectionPolicy selection,
-    InitPolicy init = InitPolicy{},
-    MutationPolicy mutation = MutationPolicy{},
-    CrossoverPolicy crossover = CrossoverPolicy{},
-    StopPolicy stop = StopPolicy{},
+    std::size_t populationSize, SelectionPolicy selection,
+    InitPolicy init = InitPolicy{}, MutationPolicy mutation = MutationPolicy{},
+    CrossoverPolicy crossover = CrossoverPolicy{}, StopPolicy stop = StopPolicy{},
     std::mt19937 rng = std::mt19937{std::random_device{}()})
-    : populationSize(populationSize),
-      population(populationSize),
-      initPolicy(std::move(init)),
-      mutationPolicy(std::move(mutation)),
-      crossoverPolicy(std::move(crossover)),
-      selection(std::move(selection)),
-      stopPolicy(std::move(stop)),
-      rng(rng)
+	
+    : populationSize(populationSize), population(populationSize),
+      initPolicy(std::move(init)), mutationPolicy(std::move(mutation)),
+      crossoverPolicy(std::move(crossover)), selection(std::move(selection)),
+      stopPolicy(std::move(stop)), rng(rng)
+	  
   {initPolicy.init(population, this->rng);}
 
+	void printPopulation(std::ostream& os = std::cout) const {
+    for (const auto& x : population) os << x << '\n';}
+  
   void run() {
     std::size_t generation = 0;
     while (!stopPolicy.shouldStop(population, generation)) {
@@ -347,7 +353,8 @@ public:
 
       ++generation;
     }
-    std::cout << "  finished after " << generation << " generations\n";
+    std::cout << "Algorithm stopped after " << generation << " generations.\n";
+	
   }
 
 private:
@@ -362,22 +369,17 @@ private:
 };
 
 //Fitness
-template<Scalar T>
-double fitness(const T& x) {
-  return -std::abs(x);
-}
+template<Scalar T> double fitness(const T& x) {
+  return -std::abs(x);}
 
-template<VectorLike T>
-double fitness(const T& x) {
+template<VectorLike T> double fitness(const T& x) {
   double sum = 0.0;
   for (auto v : x) sum += v * v;
-  return -std::sqrt(sum);
-}
+  return -std::sqrt(sum);}
 
 //Example main
 static bool approx(double a, double b, double eps = 1e-9) {
-  return std::fabs(a - b) <= eps;
-}
+  return std::fabs(a - b) <= eps;}
 
 template <class F>
 static void run_test(const std::string& name, F&& fn) {
@@ -392,9 +394,8 @@ static void run_test(const std::string& name, F&& fn) {
 }
 
 int main() {
-  std::cout << "=== Manual policy tests (no framework) ===\n";
 
-  // -------------------- INIT POLICIES --------------------
+  //INIT POLICIES
   run_test("RandomInitiationPolicy: range", [] {
     std::mt19937 rng(123);
     std::vector<double> pop(2000);
