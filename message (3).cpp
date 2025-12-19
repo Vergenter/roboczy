@@ -57,12 +57,14 @@ U random_delta(const U&, std::mt19937& rng, double intensity) requires Scalar<U>
   }
 }
 
-template<class U>
-U random_delta(const U& sample, std::mt19937& rng, double intensity) requires VectorLike<U> {
+template <class U>
+U random_delta(const U& sample, std::mt19937& rng, double intensity) requires VectorLike<U>
+{
   U r = sample;
-  std::uniform_real_distribution<double> d(-intensity, intensity);
-  for (auto& v : r)
-    v = static_cast<std::remove_cvref_t<decltype(v)>>(d(rng));
+  for (auto& v : r) {
+    using Elem = std::remove_cvref_t<decltype(v)>;
+    v = gene::random_delta<Elem>(Elem{}, rng, intensity); // delegate to scalar
+  }
   return r;
 }
 
@@ -94,15 +96,15 @@ U mul(const U& a, double s) requires VectorLike<U> {
 
 template<class U>
 double to_scalar(const U& x) requires Scalar<U> {
-  return static_cast<double>(x);
+  return static_cast<long double>(x);
 }
 
 template<class U>
 double to_scalar(const U& x) requires VectorLike<U> {
-  double sum = 0.0;
+  long double sum = 0.0;
   std::size_t n = 0;
-  for (auto v : x) { sum += static_cast<double>(v); ++n; }
-  return (n == 0) ? 0.0 : (sum / static_cast<double>(n));}
+  for (auto v : x) { sum += static_cast<long double>(v); ++n; }
+  return (n == 0) ? 0.0 : (sum / static_cast<long double>(n));}
 }
 
 namespace pretty { 
@@ -293,7 +295,7 @@ public:
 template<typename Type, double PARAM> class StableAvgStopConditionPolicy {
 public:
   bool shouldStop(const std::vector<Type>& population, std::size_t) {
-    double avg = 0.0;
+    long double avg = 0.0;
     for (auto& x : population)
       avg += gene::to_scalar(x);
     avg /= population.size();
