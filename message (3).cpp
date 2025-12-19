@@ -26,11 +26,10 @@ namespace gene {template <class U>
 U random_between(const U& mn, const U& mx, std::mt19937& rng) requires Scalar<U> {
   if constexpr (std::is_integral_v<U>) {
     std::uniform_int_distribution<U> d(mn, mx);
-    return d(rng);
-  } else {
+    return d(rng);} 
+	else {
     std::uniform_real_distribution<double> d((double)mn, (double)mx);
-    return static_cast<U>(d(rng));
-  }
+    return static_cast<U>(d(rng));}
 }
 
 template<class U>
@@ -106,28 +105,24 @@ double to_scalar(const U& x) requires VectorLike<U> {
   return (n == 0) ? 0.0 : (sum / static_cast<double>(n));}
 }
 
-template<typename Type>
-class RandomInitiationPolicy {
+template<typename Type> class RandomInitiationPolicy {
 public:
   RandomInitiationPolicy(const Type& min, const Type& max) : min_(min), max_(max) {}
 
   void init(std::vector<Type>& population, std::mt19937& rng) const {
     for (auto& x : population)
-      x = gene::random_between(min_, max_, rng);
-  }
+      x = gene::random_between(min_, max_, rng);}
 
 private:
   Type min_;
   Type max_;
 };
 
-template<typename Type>
-class LinSpaceInitiationPolicy {
+template<typename Type> class LinSpaceInitiationPolicy {
 public:
   LinSpaceInitiationPolicy(Type min, Type max) : min_(std::move(min)), max_(std::move(max)) {}
-  void init(std::vector<Type>& population, std::mt19937&) const
-    requires Scalar<Type>
-  {
+  void init(std::vector<Type>& population, std::mt19937&) 
+	const requires Scalar<Type>{
     const std::size_t n = population.size();
     if (n == 0) return;
     if (n == 1) { population[0] = min_; return; }
@@ -135,15 +130,13 @@ public:
     using CT = std::common_type_t<Type, double>;
     CT step = (static_cast<CT>(max_) - static_cast<CT>(min_)) / static_cast<CT>(n - 1);
     for (std::size_t i = 0; i < n; ++i)
-      population[i] = static_cast<Type>(static_cast<CT>(min_) + static_cast<CT>(i) * step);
-  }
+      population[i] = static_cast<Type>(static_cast<CT>(min_) + static_cast<CT>(i) * step);}
 
   void init(std::vector<Type>& population, std::mt19937&) const
-    requires VectorLike<Type>
-  {
+    requires VectorLike<Type>{
     const std::size_t n = population.size();
     if (n == 0) return;
-    if (n == 1) { population[0] = min_; return; }
+    if (n == 1) { population[0] = min_; return;}
 
     for (std::size_t i = 0; i < n; ++i) {
       double t = static_cast<double>(i) / static_cast<double>(n - 1);
@@ -154,11 +147,8 @@ public:
       for (; xi != std::end(x); ++xi, ++mi, ++ma) {
         using Elem = std::remove_cvref_t<decltype(*xi)>;
         double v = static_cast<double>(*mi) + (static_cast<double>(*ma) - static_cast<double>(*mi)) * t;
-        *xi = static_cast<Elem>(v);
-      }
-      population[i] = std::move(x);
-    }
-  }
+        *xi = static_cast<Elem>(v);}
+      population[i] = std::move(x);}}
 
 private:
   Type min_;
@@ -166,8 +156,7 @@ private:
 };
 
 //Mutation policies
-template<typename Type, int CHANCE, int INTENSITY>
-class PercentageMutationPolicy {
+template<typename Type, int CHANCE, int INTENSITY> class PercentageMutationPolicy {
 public:
   static_assert(CHANCE >= 0 && CHANCE <= 100, "Value must be >=0 and <= 100");
   static_assert(INTENSITY > 0, "Value must be >0");
@@ -176,17 +165,14 @@ public:
     std::uniform_int_distribution<int> prob(0, 99);
     std::uniform_real_distribution<double> factor(
       1.0 - INTENSITY / 100.0,
-      1.0 + INTENSITY / 100.0
-    );
+      1.0 + INTENSITY / 100.0);
 
     for (auto& x : population)
       if (prob(rng) < CHANCE)
-        x = gene::mul(x, factor(rng));
-  }
+        x = gene::mul(x, factor(rng));}
 };
 
-template<Gene Type, int CHANCE, double INTENSITY>
-class AbsoluteMutationPolicy {
+template<Gene Type, int CHANCE, double INTENSITY> class AbsoluteMutationPolicy {
 public:
   static_assert(CHANCE >= 0 && CHANCE <= 100, "Value must be >=0 and <= 100");
   static_assert(INTENSITY > 0, "Value must be >0");
@@ -196,43 +182,35 @@ public:
 
     for (auto& x : population)
       if (prob(rng) < CHANCE)
-        x = gene::add(x, gene::random_delta(x, rng, INTENSITY));
-  }
+        x = gene::add(x, gene::random_delta(x, rng, INTENSITY));}
 };
 
 //Crossover policies
-template<typename Type, double WEIGHT>
-class AverageCrossoverPolicy {
+template<typename Type, double WEIGHT> class AverageCrossoverPolicy {
 public:
   static_assert(WEIGHT >= 0 && WEIGHT <= 1, "Value must be >=0 and <= 1");
 
   Type crossover(const Type& a, const Type& b, std::mt19937&) const {
-    return gene::add(gene::mul(a, WEIGHT), gene::mul(b, 1.0 - WEIGHT));
-  }
+    return gene::add(gene::mul(a, WEIGHT), gene::mul(b, 1.0 - WEIGHT));}
 };
 
-template<typename Type>
-class RandomCrossoverPolicy {
+template<typename Type> class RandomCrossoverPolicy {
 public:
   Type crossover(const Type& a, const Type& b, std::mt19937& rng) const {
     std::uniform_real_distribution<double> w(0.0, 1.0);
     double weight = w(rng);
-    return gene::add(gene::mul(a, weight), gene::mul(b, 1.0 - weight));
-  }
+    return gene::add(gene::mul(a, weight), gene::mul(b, 1.0 - weight));}
 };
 
 //Selection policies
-template<typename Type>
-class RandomSelectionPolicy {
+template<typename Type> class RandomSelectionPolicy {
 public:
   std::pair<Type, Type> select(const std::vector<Type>& population, std::mt19937& rng) const {
     std::uniform_int_distribution<std::size_t> dist(0, population.size() - 1);
-    return { population[dist(rng)], population[dist(rng)] };
-  }
+    return { population[dist(rng)], population[dist(rng)] };}
 };
 
-template<typename Type>
-class UniqueRandomSelectionPolicy {
+template<typename Type> class UniqueRandomSelectionPolicy {
 public:
   std::pair<Type, Type> select(const std::vector<Type>& population, std::mt19937& rng) {
     if (pairs.empty() || cachedSize != population.size()) {
@@ -263,8 +241,7 @@ private:
   }
 };
 
-template<typename Type, int FIRST, int LAST, typename Fitness>
-class TargetSelectionPolicy {
+template<typename Type, int FIRST, int LAST, typename Fitness> class TargetSelectionPolicy {
 public:
   static_assert(FIRST >= 0 && FIRST <= 100, "Value must be >=0 and <= 100");
   static_assert(LAST  >= 0 && LAST  <= 100, "Value must be >=0 and <= 100");
@@ -293,23 +270,20 @@ public:
 
     std::discrete_distribution<std::size_t> dist(probs.begin(), probs.end());
 
-    return { population[idx[dist(rng)]], population[idx[dist(rng)]] };
-  }
+    return { population[idx[dist(rng)]], population[idx[dist(rng)]] };}
 
 private:
   Fitness fit;
 };
 
 //Stop policies
-template<typename Type, std::size_t PARAM>
-class MaxGenStopConditionPolicy {
+template<typename Type, std::size_t PARAM> class MaxGenStopConditionPolicy {
 public:
   bool shouldStop(const std::vector<Type>&, std::size_t generation) const {
     return generation >= PARAM;}
 };
 
-template<typename Type, double PARAM>
-class StableAvgStopConditionPolicy {
+template<typename Type, double PARAM> class StableAvgStopConditionPolicy {
 public:
   bool shouldStop(const std::vector<Type>& population, std::size_t) {
     double avg = 0.0;
@@ -390,7 +364,6 @@ private:
 };
 
 //Fitness
-
 template<Scalar T>
 double fitness(const T& x) {
   return -std::abs(x);
@@ -589,7 +562,7 @@ int main() {
     for (std::size_t gen = 0; gen < 10; ++gen) {
       if (stop.shouldStop(pop, gen)) { stopped = true; break; }
     }
-    assert(stopped); 
+    assert(stopped); // your implementation needs >2 stable checks, so should stop by gen ~3-4
   });
 
   std::cout << "=== ALL POLICY TESTS PASSED ===\n";
