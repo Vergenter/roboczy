@@ -298,15 +298,22 @@ private:
     RNG rng;
 };
 
-
-
 double fitness(double x) { return -(x - 3) * (x - 3); }
 
 int main() {
     auto sel = TargetSelectionPolicy<double, decltype(&fitness), 50, 5>(&fitness);
 
-    EvolutionaryAlgorithm<
-    double,
+    EvolutionaryAlgorithm<double,
+    LinSpaceInitiationPolicy<double, -10.0, 10.0>,
+    AbsoluteMutationPolicy<double, 20, 10.0>,
+    AverageCrossoverPolicy<double, 1.0>, decltype(sel),
+    StableAvgStopConditionPolicy<double, 0.5> > algo(20, sel,{}, {}, {}, {}, RNG(42));
+	
+    algo.run();
+	
+	/*
+	auto sel = TargetSelectionPolicy<double, decltype(&fitness), 50, 5>(&fitness);
+    EvolutionaryAlgorithm<double,
     LinSpaceInitiationPolicy<double, -10.0, 10.0>,
     AbsoluteMutationPolicy<double, 20, 10.0>,
     AverageCrossoverPolicy<double, 1.0>,
@@ -319,11 +326,11 @@ int main() {
     //{},
 	
     {}, {}, {}, {},   // domyślne polityki
-    RNG(42)
-);
-
+    RNG(42));
+	
     algo.run();
-
+	*/
+	
 }
 
 

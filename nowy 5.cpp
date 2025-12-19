@@ -12,27 +12,26 @@
 template<typename T> concept Scalar = std::is_arithmetic_v<std::remove_cvref_t<T>>;
 
 template<typename T> concept VectorLike = requires(T a, std::size_t i) {
-        { a.size() } -> std::convertible_to<std::size_t>;
-        { a[i] };               // dostęp przez indeks
-        { std::begin(a) };      // iterowalny
+        { a.size() } -> std::convertible_to<std::size_t>; { a[i] }; { std::begin(a) };  
         { std::end(a) };} && Scalar<std::remove_cvref_t<decltype(std::declval<T>()[0])>>;
 		
 template<typename T> concept Gene = Scalar<T> || VectorLike<T>;
+
+template<typename T> concept InitializableGene = Gene<T>;
 
 template<Gene T> struct GeneOps;
 
 template<Scalar T>
 struct GeneOps<T> {
     static T add(const T& a, const T& b) { return a + b; }
-    static T mul(const T& a, double s) { return static_cast<T>(a * s); }
-
-    static T random_delta(const T& /*sample*/, std::mt19937& rng, double intensity) {
+    static T mul(const T& a, double s) { return static_cast<T>(a * s);
+    static T random_delta(const T&, std::mt19937& rng, double intensity) {
     std::uniform_real_distribution<double> d(-intensity, intensity);
     return static_cast<T>(d(rng));}
+	
+	static T random_between(const T& min, const T& max, std::mt19937& rng);}
 
-    static double to_scalar(const T& x) {
-        return static_cast<double>(x);
-    }
+    static double to_scalar(const T& x) {return static_cast<double>(x);}
 };
 
 template<VectorLike T>
@@ -41,25 +40,29 @@ struct GeneOps<T> {
         T r = a;
         for (std::size_t i = 0; i < r.size(); ++i)
             r[i] += b[i];
-        return r;
-    }
+        return r;}
 
     static T mul(const T& a, double s) {
         T r = a;
         for (auto& v : r) v *= s;
-        return r;
-    }
+        return r;}
 
-    static T random_delta(const T& sample, std::mt19937& rng, double intensity) {
+    static T random_delta(const T& sample, std::mt19937& rng, double intensity){
         T r = sample;
         std::uniform_real_distribution<double> d(-intensity, intensity);
         for (auto& v : r) v = d(rng);
-        return r;
-    }
+        return r;}
+
+	static T random_between(const T& min, const T& max, std::mt19937& rng){
+        T r = min;
+        for (std::size_t i = 0; i < r.size(); ++i) {
+            using Elem = std::remove_cvref_t<decltype(r[i])>;
+            std::uniform_real_distribution<double> d(min[i], max[i]);
+            r[i] = static_cast<Elem>(d(rng));}
+        return r;}
 
     static double to_scalar(const T& x) {
-        return std::accumulate(x.begin(), x.end(), 0.0) / x.size();
-    }
+        return std::accumulate(x.begin(), x.end(), 0.0) / x.size();}
 };
 
 //#############################
@@ -68,16 +71,14 @@ struct GeneOps<T> {
 template<typename Type>
 class RandomInitiationPolicy {
 public:
-    RandomInitiationPolicy(const Type min,const Type max) : min_(min), max_(max) {}
+    RandomInitiationPolicy(const Type& min, const Type& max) : min_(min), max_(max) {}
 
-    void init(std::vector<Type>& population, std::size_t size, std::mt19937& rng) const {
+    void init(std::vector<Type>& population,
+              std::size_t size,
+              std::mt19937& rng) const{
         population.resize(size);
-        if constexpr (std::is_integral_v<Type>) {
-            std::uniform_int_distribution<Type> dist(min_, max_);
-            for (auto& x : population) x = dist(rng);
-        } else {
-            std::uniform_real_distribution<Type> dist(min_, max_);
-            for (auto& x : population) x = dist(rng);
+        for (auto& x : population) {
+            x = GeneOps<Type>::random_between(min_, max_, rng);
         }
     }
 
@@ -94,8 +95,6 @@ public:
 
     void init(std::vector<Type>& population, std::size_t size, std::mt19937&) const {
         population.resize(size);
-        if (size == 0) return;
-        if (size == 1) { population[0] = min_; return; }
 
         using CT = std::common_type_t<Type, double>;
         CT step = (static_cast<CT>(max_) - static_cast<CT>(min_)) / static_cast<CT>(size - 1);
