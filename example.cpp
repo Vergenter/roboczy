@@ -19,11 +19,13 @@
  *  - RandomInitiationPolicy<Type, MIN, MAX>: wypełnia populację losowymi osobnikami z zakresu (MIN, MAX)
  *  - LinSpaceInitiationPolicy<Type, MIN, MAX>: wypełnia populację osobnikami z zakresu (MIN, MAX),
  *    tak aby osobniki były liniowo rozłożone pomiędzy MIN i MAX.
+ * 
  * Klasy wytycznych dla mutacji populacji:
  *  - PercentageMutationPolicy<Type, CHANCE, INTENSITY>: mutuje z prawdopodobieństwem CHANCE
  *    i mnoży wartość osobnika przez liczbę z zakresu (1 - INTENSITY/100, 1 + INTENSITY/100).
  *  - AbsoluteMutationPolicy<Type, CHANCE, INTENSITY>: mutuje z prawdopodobieństwem CHANCE
  *    i dodaje do wartości osobnika losową wartość z zakresu (-INTENSITY, INTENSITY).
+ * 
  * Klasy wytycznych dla krzyżowania populacji:
  *  - AverageCrossoverPolicy<Type, WEIGHT>: tworzy nowego osobnika jako średnią ważoną rodziców (wagi to WEIGHT i 1 - WEIGHT).
  *    W przypadku wektorów wagi powinny być wektorami o wartościach z zakresu (0, 1) i tej samej długości co Type.
