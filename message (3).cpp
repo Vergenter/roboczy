@@ -127,8 +127,8 @@ public:
       x = gene::random_between(min_, max_, rng);}
 
 private:
-  Type min_;
-  Type max_;
+  const Type min_;
+  const Type max_;
 };
 
 template<typename Type> class LinSpaceInitiationPolicy {
@@ -164,8 +164,8 @@ public:
       population[i] = std::move(x);}}
 
 private:
-  Type min_;
-  Type max_;
+  const Type min_;
+  const Type max_;
 };
 
 //Mutation policies
