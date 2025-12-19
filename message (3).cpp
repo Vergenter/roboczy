@@ -13,7 +13,7 @@
 #include <cassert>
 
 //Concepts
-template<typename T> concept Scalar = std::is_arithmetic_v<std::remove_cvref_t<T>>;
+template<typename T> concept Scalar = std::is_arithmetic_v<std::remove_cvref_t<T>>; //std::remove_cvref_t<T> remove from T: const, volatile and references &, && (for std::is_arithmetic_v to work)
 
 template<typename T> concept VectorLike = requires(T a) {
     std::begin(a);
@@ -40,8 +40,7 @@ U random_between(const U& mn, const U& mx, std::mt19937& rng) requires VectorLik
   auto ma = std::begin(mx);
   for (; ri != std::end(r); ++ri, ++mi, ++ma) {
     using Elem = std::remove_cvref_t<decltype(*ri)>;
-    *ri = random_between<Elem>(*mi, *ma, rng);
-  }
+    *ri = random_between<Elem>(*mi, *ma, rng);}
   return r;
 }
 
@@ -50,8 +49,8 @@ U random_delta(const U&, std::mt19937& rng, double intensity) requires Scalar<U>
   if constexpr (std::is_integral_v<U>) {
     const auto I = static_cast<U>(std::llround(intensity));
     std::uniform_int_distribution<long long> d(-static_cast<long long>(I), static_cast<long long>(I));
-    return static_cast<U>(d(rng));
-  } else {
+    return static_cast<U>(d(rng));} 
+    else {
     std::uniform_real_distribution<double> d(-intensity, intensity);
     return static_cast<U>(d(rng));
   }
@@ -108,17 +107,14 @@ double to_scalar(const U& x) requires VectorLike<U> {
 }
 
 namespace pretty { 
-template <Scalar T> void print_value(std::ostream& os, const T& x) {
-  os << x;}
+template <Scalar T> void print_value(std::ostream& os, const T& x) { os << x;}
 
 template <VectorLike V> void print_value(std::ostream& os, const V& v) {
   os << '[';
   auto it = std::begin(v);
   auto end = std::end(v);
-
-  if (it != end) { print_value(os, *it); ++it; }
+  if (it != end) { print_value(os, *it); ++it; }  //też dla wielowymiarowych tablic
   for (; it != end; ++it) { os << ", "; print_value(os, *it); }
-
   os << ']';}
   }
 
