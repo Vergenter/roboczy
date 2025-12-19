@@ -105,20 +105,20 @@ double to_scalar(const U& x) requires VectorLike<U> {
   return (n == 0) ? 0.0 : (sum / static_cast<double>(n));}
 }
 
-template <VectorLike V> std::ostream& operator<<(std::ostream& os, const V& v) {
+namespace pretty { 
+template <Scalar T> void print_value(std::ostream& os, const T& x) {
+  os << x;}
+
+template <VectorLike V> void print_value(std::ostream& os, const V& v) {
   os << '[';
   auto it = std::begin(v);
   auto end = std::end(v);
 
-  if (it != end) {
-    os << *it;
-    ++it;}
+  if (it != end) { print_value(os, *it); ++it; }
+  for (; it != end; ++it) { os << ", "; print_value(os, *it); }
 
-  for (; it != end; ++it) {
-    os << ", " << *it;}
-
-  return os << ']';
-}
+  os << ']';}
+  }
 
 template<typename Type> class RandomInitiationPolicy {
 public:
@@ -263,8 +263,7 @@ public:
     std::vector<std::size_t> idx(n);
     std::iota(idx.begin(), idx.end(), 0);
 
-    std::sort(idx.begin(), idx.end(),
-      [&](std::size_t a, std::size_t b) { return fit(population[a]) > fit(population[b]); });
+    std::sort(idx.begin(), idx.end(), [&](std::size_t a, std::size_t b) { return fit(population[a]) > fit(population[b]); });
 
     std::vector<double> probs(n);
     if (n == 1) {
@@ -333,8 +332,10 @@ public:
 	  
   {initPolicy.init(population, this->rng);}
 
-	void printPopulation(std::ostream& os = std::cout) const {
-    for (const auto& x : population) os << x << '\n';}
+  void printPopulation(std::ostream& os = std::cout) const {
+	for (const auto& x : population) {
+      pretty::print_value(os, x);
+      os << '\n';}}
   
   void run() {
     std::size_t generation = 0;
@@ -354,7 +355,7 @@ public:
       ++generation;
     }
     std::cout << "Algorithm stopped after " << generation << " generations.\n";
-	
+	printPopulation();	
   }
 
 private:
@@ -377,101 +378,78 @@ template<VectorLike T> double fitness(const T& x) {
   for (auto v : x) sum += v * v;
   return -std::sqrt(sum);}
 
-//Example main
 static bool approx(double a, double b, double eps = 1e-9) {
   return std::fabs(a - b) <= eps;}
 
-template <class F>
-static void run_test(const std::string& name, F&& fn) {
+template <class F> static void run_test(const std::string& name, F&& fn) {
   std::cout << "[TEST] " << name << " ... ";
   try {
     fn();
-    std::cout << "OK\n";
-  } catch (...) {
+    std::cout << "OK\n";} 
+	catch (...) {
     std::cout << "FAIL\n";
-    throw;
-  }
+    throw;}
 }
 
 int main() {
 
-  //INIT POLICIES
-  run_test("RandomInitiationPolicy: range", [] {
+  //INIT POLICIES 
+ run_test("RandomInitiationPolicy: range", [] {
     std::mt19937 rng(123);
     std::vector<double> pop(2000);
-
     RandomInitiationPolicy<double> init(2.0, 3.0);
     init.init(pop, rng);
-
     auto [mn, mx] = std::minmax_element(pop.begin(), pop.end());
     assert(*mn >= 2.0);
-    assert(*mx <=  3.0);
-  });
+    assert(*mx <=  3.0);});
 
-run_test("RandomInitiationPolicy (vector): per-component range", [] {
+ run_test("RandomInitiationPolicy (vector): per-component range", [] {
   std::mt19937 rng(123);
-
   using V = std::array<double, 3>;
   std::vector<V> pop(2000);
-
   V mn{ { -1.0,  0.0,  10.0 } };
   V mx{ {  1.0,  2.0,  13.0 } };
-
   RandomInitiationPolicy<V> init(mn, mx);
   init.init(pop, rng);
-
   for (const auto& x : pop) {
     for (std::size_t i = 0; i < x.size(); ++i) {
       assert(x[i] >= mn[i]);
-      assert(x[i] <= mx[i]);
-    }
-  }
+      assert(x[i] <= mx[i]);}}
 });
 
-  run_test("RandomInitiationPolicy: range", [] {
+ run_test("RandomInitiationPolicy: range", [] {
     std::mt19937 rng(123);
     std::vector<double> pop(2000);
-
     RandomInitiationPolicy<double> init(2.0, 3.0);
     init.init(pop, rng);
-
     auto [mn, mx] = std::minmax_element(pop.begin(), pop.end());
     assert(*mn >= 2.0);
-    assert(*mx <=  3.0);
-  });
+    assert(*mx <=  3.0);});
 
   run_test("LinSpaceInitiationPolicy (scalar): endpoints + monotonic", [] {
     std::mt19937 rng(123);
     std::vector<double> pop(5);
-
     LinSpaceInitiationPolicy<double> init(-2.0, 3.0);
     init.init(pop, rng);
-
     assert(approx(pop.front(), -2.0));
     assert(approx(pop.back(),   3.0));
-    for (std::size_t i = 1; i < pop.size(); ++i) assert(pop[i] >= pop[i - 1]);
-  });
+    for (std::size_t i = 1; i < pop.size(); ++i) assert(pop[i] >= pop[i - 1]);});
 
-  // -------------------- MUTATION POLICIES --------------------
+  //MUTATION POLICIES
   run_test("PercentageMutationPolicy: CHANCE=0 does nothing", [] {
     std::mt19937 rng(123);
     std::vector<double> pop = {1,2,3,4,5};
     auto before = pop;
-
     PercentageMutationPolicy<double, 0, 50> mut;
     mut.mutate(pop, rng);
-
-    assert(pop == before);
-  });
+    assert(pop == before);});
 
   run_test("PercentageMutationPolicy: CHANCE=100 changes something (INTENSITY>0)", [] {
     std::mt19937 rng(123);
     std::vector<double> pop = {1,2,3,4,5};
     auto before = pop;
-
     PercentageMutationPolicy<double, 100, 50> mut;
     mut.mutate(pop, rng);
-
     bool anyDiff = false;
     for (std::size_t i = 0; i < pop.size(); ++i) {
       if (!approx(pop[i], before[i])) { anyDiff = true; break; }
@@ -483,10 +461,8 @@ run_test("RandomInitiationPolicy (vector): per-component range", [] {
     std::mt19937 rng(123);
     std::vector<double> pop = {10,10,10,10,10};
     auto before = pop;
-
     AbsoluteMutationPolicy<double, 0, 2.0> mut;
     mut.mutate(pop, rng);
-
     assert(pop == before);
   });
 
@@ -494,49 +470,41 @@ run_test("RandomInitiationPolicy (vector): per-component range", [] {
     std::mt19937 rng(123);
     std::vector<double> pop = {10,10,10,10,10};
     auto before = pop;
-
     AbsoluteMutationPolicy<double, 100, 2.0> mut;
     mut.mutate(pop, rng);
-
     for (std::size_t i = 0; i < pop.size(); ++i) {
       double d = pop[i] - before[i];
       assert(d >= -2.0 - 1e-9 && d <= 2.0 + 1e-9);
     }
   });
 
-  // -------------------- CROSSOVER POLICIES --------------------
+  //CROSSOVER POLICIES
   run_test("AverageCrossoverPolicy: deterministic weight", [] {
     std::mt19937 rng(123);
     AverageCrossoverPolicy<double, 0.25> cx;
-
     double a = 10.0, b = 2.0;
     double c = cx.crossover(a, b, rng);
-
     assert(approx(c, 0.25*a + 0.75*b));
   });
 
   run_test("RandomCrossoverPolicy: convex combination bounds", [] {
     std::mt19937 rng(123);
     RandomCrossoverPolicy<double> cx;
-
     double a = 10.0, b = 2.0;
     for (int i = 0; i < 2000; ++i) {
       double c = cx.crossover(a, b, rng);
-      assert(c >= 2.0 && c <= 10.0);
-    }
+      assert(c >= 2.0 && c <= 10.0);}
   });
 
-  // -------------------- SELECTION POLICIES --------------------
+  //SELECTION POLICIES
   run_test("RandomSelectionPolicy: parents come from population", [] {
     std::mt19937 rng(123);
     std::vector<int> pop = {5,6,7};
     RandomSelectionPolicy<int> sel;
-
     for (int k = 0; k < 200; ++k) {
       auto [a,b] = sel.select(pop, rng);
       assert(std::find(pop.begin(), pop.end(), a) != pop.end());
-      assert(std::find(pop.begin(), pop.end(), b) != pop.end());
-    }
+      assert(std::find(pop.begin(), pop.end(), b) != pop.end());}
   });
 
   run_test("UniqueRandomSelectionPolicy: unique ordered pairs for n=4 (12 draws)", [] {
@@ -554,29 +522,23 @@ run_test("RandomInitiationPolicy (vector): per-component range", [] {
 
   run_test("TargetSelectionPolicy: biases towards best (statistical smoke)", [] {
     std::mt19937 rng(123);
-    std::vector<double> pop(50);
-    {
+    std::vector<double> pop(50);{
       LinSpaceInitiationPolicy<double> init(0.0, 49.0);
-      init.init(pop, rng);
-    }
-
-    auto fit = [](double x) { return x; }; // best is 49
-    // NOTE TEMPLATE ORDER: <Type, FIRST, LAST, Fitness>
+      init.init(pop, rng);}
+    auto fit = [](double x) { return x; };
+    //template order: <Type, FIRST, LAST, Fitness>
     TargetSelectionPolicy<double, 30, 1, decltype(fit)> sel(fit);
-
     int pickedBest = 0;
     for (int i = 0; i < 3000; ++i) {
       auto [a,b] = sel.select(pop, rng);
-      if (approx(a, 49.0) || approx(b, 49.0)) ++pickedBest;
-    }
+      if (approx(a, 49.0) || approx(b, 49.0)) ++pickedBest;}
     assert(pickedBest > 3000 * 0.065);
   });
 
-  // -------------------- STOP POLICIES --------------------
+  //STOP POLICIES
   run_test("MaxGenStopConditionPolicy: stops at PARAM", [] {
     MaxGenStopConditionPolicy<int, 5> stop;
     std::vector<int> dummyPop = {1,2,3};
-
     std::size_t gen = 0;
     while (!stop.shouldStop(dummyPop, gen)) ++gen;
     assert(gen == 5);
@@ -585,98 +547,63 @@ run_test("RandomInitiationPolicy (vector): per-component range", [] {
   run_test("StableAvgStopConditionPolicy: stable population stops within <= 10 checks", [] {
     StableAvgStopConditionPolicy<double, 1e-12> stop;
     std::vector<double> pop = {1,1,1,1};
-
     bool stopped = false;
     for (std::size_t gen = 0; gen < 10; ++gen) {
-      if (stop.shouldStop(pop, gen)) { stopped = true; break; }
-    }
-    assert(stopped); // your implementation needs >2 stable checks, so should stop by gen ~3-4
-  });
+      if (stop.shouldStop(pop, gen)) { stopped = true; break; }}
+    assert(stopped);
 
-run_test("E2E scalar: converges toward zero", [] {
-  using T = double;
-
-  std::mt19937 rng(123);
-
-  RandomSelectionPolicy<T> selection;
-  RandomInitiationPolicy<T> init(-10.0, 10.0);
-  AbsoluteMutationPolicy<T, 40, 0.5> mutation;
-  AverageCrossoverPolicy<T, 0.5> crossover;
-  StableAvgStopConditionPolicy<T, 1e-2> stop;
-
-  EvolutionaryAlgorithm<
-    T,
+  run_test("E2E scalar: converges toward zero", [] {
+    using T = double;
+    std::mt19937 rng(123);
+    RandomSelectionPolicy<T> selection;
+    RandomInitiationPolicy<T> init(-10.0, 10.0);
+    AbsoluteMutationPolicy<T, 40, 0.5> mutation;
+    AverageCrossoverPolicy<T, 0.5> crossover;
+    StableAvgStopConditionPolicy<T, 1e-2> stop;
+    EvolutionaryAlgorithm<T,
     decltype(init),
     decltype(mutation),
     decltype(crossover),
     decltype(selection),
     decltype(stop)
-  > ea(
-    50,
-    selection,
-    init,
-    mutation,
-    crossover,
-    stop,
-    rng
-  );
-
+  > ea(50, selection, init, mutation, crossover, stop, rng);
   ea.run();
-
   std::vector<T> pop(50);
   init.init(pop, rng);
-
   double avgAbs = 0.0;
   for (auto x : pop) avgAbs += std::abs(x);
   avgAbs /= pop.size();
-
   assert(avgAbs < 5.0);
-});
+ });
 
 run_test("E2E vector<2>: converges toward origin", [] {
   using V = std::array<double, 2>;
-
   std::mt19937 rng(123);
-
   V mn{ {-5.0, -5.0} };
   V mx{ { 5.0,  5.0} };
-
   RandomSelectionPolicy<V> selection;
   RandomInitiationPolicy<V> init(mn, mx);
   AbsoluteMutationPolicy<V, 40, 0.4> mutation;
   AverageCrossoverPolicy<V, 0.5> crossover;
   StableAvgStopConditionPolicy<V, 1e-2> stop;
 
-  EvolutionaryAlgorithm<
-    V,
+  EvolutionaryAlgorithm<V,
     decltype(init),
     decltype(mutation),
     decltype(crossover),
     decltype(selection),
     decltype(stop)
-  > ea(
-    60,
-    selection,
-    init,
-    mutation,
-    crossover,
-    stop,
-    rng
-  );
-
+  > ea(60, selection, init, mutation, crossover, stop, rng);
   ea.run();
-
   std::vector<V> pop(60);
   init.init(pop, rng);
-
   double avgNorm = 0.0;
   for (auto& x : pop)
     avgNorm += std::sqrt(x[0]*x[0] + x[1]*x[1]);
-
   avgNorm /= pop.size();
-
   assert(avgNorm < 4.0);
 });
+
   std::cout << "=== ALL POLICY TESTS PASSED ===\n";
   return 0;
 }
