@@ -553,6 +553,7 @@ int main() {
     for (std::size_t gen = 0; gen < 10; ++gen) {
       if (stop.shouldStop(pop, gen)) { stopped = true; break; }}
     assert(stopped);
+     });
 
   run_test("E2E scalar: converges toward zero", [] {
     using T = double;
