@@ -133,33 +133,35 @@ private:
 
 template<typename Type> class LinSpaceInitiationPolicy {
 public:
-  LinSpaceInitiationPolicy(Type min, Type max) : min_(std::move(min)), max_(std::move(max)) {}
+  LinSpaceInitiationPolicy( Type min, Type max) : min_(std::move(min)), max_(std::move(max)) {}
+
   void init(std::vector<Type>& population, std::mt19937&) 
 	const requires Scalar<Type>{
     const std::size_t n = population.size();
     if (n == 0) return;
     if (n == 1) { population[0] = min_; return; }
 
-    using CT = std::common_type_t<Type, double>;
+    using CT = std::common_type_t<Type, long double>;
     CT step = (static_cast<CT>(max_) - static_cast<CT>(min_)) / static_cast<CT>(n - 1);
     for (std::size_t i = 0; i < n; ++i)
       population[i] = static_cast<Type>(static_cast<CT>(min_) + static_cast<CT>(i) * step);}
 
-  void init(std::vector<Type>& population, std::mt19937&) const
-    requires VectorLike<Type>{
+
+  void init(std::vector<Type>& population, std::mt19937&) 
+  const requires VectorLike<Type>{
     const std::size_t n = population.size();
     if (n == 0) return;
     if (n == 1) { population[0] = min_; return;}
 
     for (std::size_t i = 0; i < n; ++i) {
-      double t = static_cast<double>(i) / static_cast<double>(n - 1);
+      long double t = static_cast<long double>(i) / static_cast<long double>(n - 1);
       Type x = min_;
       auto xi = std::begin(x);
       auto mi = std::begin(min_);
       auto ma = std::begin(max_);
       for (; xi != std::end(x); ++xi, ++mi, ++ma) {
         using Elem = std::remove_cvref_t<decltype(*xi)>;
-        double v = static_cast<double>(*mi) + (static_cast<double>(*ma) - static_cast<double>(*mi)) * t;
+        long double v = static_cast<long double>(*mi) + (static_cast<long double>(*ma) - static_cast<long double>(*mi)) * t;
         *xi = static_cast<Elem>(v);}
       population[i] = std::move(x);}}
 
